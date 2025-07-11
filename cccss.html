@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kat - Asistente Virtual</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #1c0731;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      text-align: center;
+      max-width: 320px;
+    }
+    h1, h2, h3, p {
+      color: white;
+    }
+    .button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      background-color: #2a4a72;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    .button:hover {
+      background-color: #3b6ca3;
+    }
+    .screen {
+      display: none;
+    }
+    .active {
+      display: block;
+    }
+    img {
+      width: 150px;
+      margin: 20px auto;
+    }
+    a {
+      color: #00aaff;
+      text-decoration: none;
+    }
+    .slider {
+      width: 100%;
+    }
+    input {
+      padding: 10px;
+      margin: 10px 0;
+      width: 90%;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Pantalla 0: Iniciar sesión -->
+    <div id="screen0" class="screen active">
+      <h1>Iniciar sesión en Kat</h1>
+      <img src="logo-gato.png" alt="Kat">
+      <button class="button" onclick="nextScreen('screen1')">Iniciar sesión con correo electrónico</button>
+      <button class="button" onclick="nextScreen('screen1')">Iniciar sesión con Gmail</button>
+      <button class="button" onclick="nextScreen('screen1')">Iniciar sesión con número de teléfono</button>
+      <button class="button" onclick="nextScreen('screen1')">Iniciar sesión con Microsoft</button>
+      <p>¿No tienes una cuenta? <a href="#" onclick="nextScreen('screen1')">Regístrate aquí</a></p>
+    </div>
+
+    <!-- Pantalla 1: Presentación -->
+    <div id="screen1" class="screen">
+      <h1>¡Hola! Soy Kat, tu asistente virtual</h1>
+      <img src="logo-gato.png" alt="Kat">
+      <button class="button" onclick="nextScreen('screen2')">Siguiente</button>
+      <button class="button" onclick="nextScreen('screen0')">Atrás</button>
+    </div>
+
+    <!-- Pantalla 2: Introducción -->
+    <div id="screen2" class="screen">
+      <h2>Hola, soy Kat. Estoy aquí para ayudarte. Vamos a hacer todo pasito a pasito, ¿sí?</h2>
+      <button class="button" onclick="nextScreen('screen3')">Sí</button>
+      <button class="button" onclick="nextScreen('screen1')">Atrás</button>
+    </div>
+
+    <!-- Pantalla 3: Selección de discapacidad -->
+    <div id="screen3" class="screen">
+      <h2>¿Qué discapacidad tienes?</h2>
+      <button class="button" onclick="nextScreen('screen_visual')">Discapacidad Visual</button>
+      <button class="button" onclick="nextScreen('screen_auditiva')">Discapacidad Auditiva</button>
+      <button class="button" onclick="nextScreen('screen_intelectual')">Discapacidad Intelectual</button>
+      <button class="button" onclick="nextScreen('screen2')">Atrás</button>
+    </div>
+
+    <!-- Discapacidad Visual -->
+    <div id="screen_visual" class="screen">
+      <h2>¿Deseas usar chat de voz?</h2>
+      <button class="button" onclick="nextScreen('screen_visual_chat')">Sí</button>
+      <button class="button" onclick="nextScreen('screen3')">No</button>
+    </div>
+
+    <div id="screen_visual_chat" class="screen">
+      <h2>Chat de voz activado</h2>
+      <p>Habla ahora y Kat te responderá.</p>
+      <div id="voice-chat">
+        <button class="button" onclick="startVoice()">🎤 Hablar</button>
+        <p id="transcript"></p>
+      </div>
+      <button class="button" onclick="nextScreen('screen_visual')">Atrás</button>
+    </div>
+
+    <!-- Discapacidad Auditiva -->
+    <div id="screen_auditiva" class="screen">
+      <h2>¿Lees bien el texto en pantalla?</h2>
+      <button class="button" onclick="nextScreen('screen_auditiva_zoom')">Sí</button>
+      <button class="button" onclick="nextScreen('screen_auditiva_zoom')">No</button>
+      <div>
+        <h3>Ajusta el tamaño del texto</h3>
+        <input type="range" min="14" max="30" value="16" class="slider" oninput="document.body.style.fontSize = this.value + 'px';">
+      </div>
+      <button class="button" onclick="nextScreen('screen3')">Atrás</button>
+    </div>
+
+    <div id="screen_auditiva_zoom" class="screen">
+      <h2>Texto ajustado según preferencia</h2>
+      <button class="button" onclick="nextScreen('screen_auditiva_direccion')">Siguiente</button>
+      <button class="button" onclick="nextScreen('screen_auditiva')">Atrás</button>
+    </div>
+
+    <div id="screen_auditiva_direccion" class="screen">
+      <h2>¿A dónde te diriges?</h2>
+      <input type="text" id="origen" placeholder="¿Dónde estás?" style="color:black;">
+      <input type="text" id="destino" placeholder="¿A dónde vas?" style="color:black;">
+      <button class="button" onclick="mostrarRuta()">Mostrar ruta más rápida</button>
+      <button class="button" onclick="nextScreen('screen_auditiva_zoom')">Atrás</button>
+    </div>
+
+    <div id="screen_ruta" class="screen">
+      <h2>Ruta más rápida:</h2>
+      <p id="ruta-mostrar">Calculando...</p>
+      <button class="button" onclick="alert('Conductor solicitado')">🚗 Solicitar conductor</button>
+      <button class="button" onclick="nextScreen('screen_auditiva_direccion')">Atrás</button>
+    </div>
+
+    <!-- Discapacidad Intelectual -->
+    <div id="screen_intelectual" class="screen">
+      <h2>¿Quieres que la app solo use imágenes?</h2>
+      <button class="button" onclick="nextScreen('screen_intelectual_img')">Sí</button>
+      <button class="button" onclick="nextScreen('screen3')">No</button>
+    </div>
+
+    <div id="screen_intelectual_img" class="screen">
+      <h2>Selecciona lo que deseas:</h2>
+      <img src="ubicacion.png" alt="Ubicación" onclick="nextScreen('screen_auditiva_direccion')" style="cursor: pointer;">
+      <img src="chat.png" alt="Hablar" onclick="nextScreen('screen_visual_chat')" style="cursor: pointer;">
+      <button class="button" onclick="nextScreen('screen_intelectual')">Atrás</button>
+    </div>
+
+  </div>
+
+  <script>
+    function nextScreen(id) {
+      const screens = document.querySelectorAll('.screen');
+      screens.forEach(screen => screen.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    function startVoice() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'es-ES';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.start();
+
+      recognition.onresult = function (event) {
+        const texto = event.results[0][0].transcript;
+        document.getElementById("transcript").innerText = "Tú: " + texto;
+        responderKat(texto);
+      };
+
+      recognition.onerror = function (event) {
+        alert("Error en el reconocimiento de voz: " + event.error);
+      };
+    }
+
+    function responderKat(texto) {
+      let respuesta = "No entendí eso.";
+      if (texto.includes("hola")) respuesta = "¡Hola! ¿Cómo puedo ayudarte?";
+      if (texto.includes("ruta")) respuesta = "¿A dónde necesitas ir?";
+      if (texto.includes("gracias")) respuesta = "¡De nada!";
+
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(respuesta);
+      utter.lang = 'es-ES';
+      synth.speak(utter);
+    }
+
+    function mostrarRuta() {
+      const origen = document.getElementById("origen").value;
+      const destino = document.getElementById("destino").value;
+      if (origen && destino) {
+        document.getElementById("ruta-mostrar").innerText = `Desde ${origen} hasta ${destino}: Ruta más rápida encontrada.`;
+        nextScreen("screen_ruta");
+      } else {
+        alert("Por favor, llena ambos campos.");
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+  const slider = document.querySelector('.slider');
+  slider.addEventListener('change', () => {
+    nextScreen('screen_auditiva_direccion');
+  });
+});
+  </script>
+</body>
+</html>
