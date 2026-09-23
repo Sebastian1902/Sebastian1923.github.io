@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magical Sunflower Universe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030308; /* Deep cosmic dark blue/black */
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 215, 0, 0.7);
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 1s ease-in-out;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .hidden {
+            opacity: 0;
+        }
+
+        #quote {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -20px); /* Starts slightly lower */
+            color: #FFF8E7; /* Soft cosmic white */
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-family: 'Dancing Script', cursive;
+            text-align: center;
+            width: 90%;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.9), 0 0 10px rgba(255, 150, 0, 0.8);
+            pointer-events: none;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 2.5s ease-in-out, transform 2.5s ease-out;
+        }
+
+        #quote.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%); /* Slides into center */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="world"></canvas>
+    </div>
+    
+    <div id="instructions">Toca el girasol</div>
+    <div id="quote">Un universo entero florece para ti...</div>
+
+    <script>
+        const canvas = document.getElementById('world');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        const instructions = document.getElementById('instructions');
+        const quote = document.getElementById('quote');
+
+        let width, height, centerX, centerY;
+        let animationFrameId;
+        
+        // Application States: 'INTRO', 'TRANS', 'UNIVERSE'
+        let appState = 'INTRO';
+        let transitionProgress = 0;
+        let flashAlpha = 0;
+
+        // Interaction variables
+        let mouseX = 0;
+        let mouseY = 0;
+        let isHoveringFlower = false;
+
+        // Time tracking for smooth animations
+        let lastTime = 0;
+
+        // Camera / 3D space settings
+        const fov = 400;
+
+        // Resize handler
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // To maintain high 60fps performance with hundreds of detailed flowers, 
+        // we pre-render a beautiful vector-style sunflower onto an offscreen canvas.
+        function createFlowerCache(size) {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = size;
+            offCanvas.height = size;
+            const oCtx = offCanvas.getContext('2d');
+            
+            const r = size / 2;
+            oCtx.translate(r, r);
+
+            const numPetals = 24;
+            const petalLength = r * 0.85;
+            const petalWidth = r * 0.18;
+
+            // Draw back layer of petals (darker, slightly rotated)
+            oCtx.save();
+            oCtx.rotate(Math.PI / numPetals);
+            for (let i = 0; i < numPetals; i++) {
+                oCtx.rotate((Math.PI * 2) / numPetals);
+                drawPetal(oCtx, petalLength * 0.95, petalWidth * 1.1, '#D49A00', '#B07500');
+            }
+            oCtx.restore();
+
+            // Draw front layer of petals (brighter)
+            for (let i = 0; i < numPetals; i++) {
+                oCtx.rotate((Math.PI * 2) / numPetals);
+                drawPetal(oCtx, petalLength, petalWidth, '#FFD700', '#FF9500');
+            }
+
+            // Draw center (brown with seed texture)
+            const centerRadius = r * 0.35;
+            
+            // Outer center edge
+            oCtx.beginPath();
+            oCtx.arc(0, 0, centerRadius, 0, Math.PI * 2);
+            let centerGrad = oCtx.createRadialGradient(0, 0, centerRadius * 0.5, 0, 0, centerRadius);
+            centerGrad.addColorStop(0, '#2C1808');
+            centerGrad.addColorStop(1, '#1A0C03');
+            oCtx.fillStyle = centerGrad;
+            oCtx.fill();
+
+            // Add inner texture ring (seeds)
+            oCtx.beginPath();
+            oCtx.arc(0, 0, centerRadius * 0.8, 0, Math.PI * 2);
+            oCtx.fillStyle = '#3E2723';
+            oCtx.fill();
+
+            // Draw seeds (golden/brown dots) using a spiral pattern
+            oCtx.fillStyle = '#5D4037';
+            let phi = (Math.sqrt(5) + 1) / 2;
+            for (let i = 0; i < 400; i++) {
+                let r_seed = Math.sqrt(i) * (centerRadius * 0.04);
+                let theta = i * 2 * Math.PI / (phi * phi);
+                if (r_seed > centerRadius * 0.9) break;
+                
+                let sx = r_seed * Math.cos(theta);
+                let sy = r_seed * Math.sin(theta);
+                
+                oCtx.beginPath();
+                oCtx.arc(sx, sy, r * 0.015, 0, Math.PI * 2);
+                oCtx.fillStyle = (i % 5 === 0) ? '#8D6E63' : '#3E2723'; // Occasional lighter seed
+                oCtx.fill();
+            }
+
+            return offCanvas;
+        }
+
+        function drawPetal(ctx, length, width, colorLight, colorDark) {
+            ctx.beginPath();
+            // Quadratic curve to create a pointed, natural petal shape
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(width, length * 0.4, 0, length);
+            ctx.quadraticCurveTo(-width, length * 0.4, 0, 0);
+            
+            // Petal gradient
+            let grad = ctx.createLinearGradient(0, 0, 0, length);
+            grad.addColorStop(0, colorDark);
+            grad.addColorStop(0.3, colorLight);
+            grad.addColorStop(1, colorDark);
+            
+            ctx.fillStyle = grad;
+            ctx.fill();
+            
+            // Add slight line in the middle of the petal
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, length * 0.8);
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Cache two sizes: one for the large hero flower, one for the universe particles
+        const flowerImageLarge = createFlowerCache(600);
+        const flowerImageSmall = createFlowerCache(200);
+
+
+        // Ambient background stars
+        class AmbientStar {
+            constructor() {
+                this.reset(true);
+            }
+            reset(randomizeAlpha) {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.r = Math.random() * 1.5 + 0.5;
+                this.alpha = randomizeAlpha ? Math.random() : 0;
+                this.speed = (Math.random() * 0.5 + 0.1) * (Math.random() < 0.5 ? 1 : -1);
+                this.color = Math.random() > 0.8 ? '#A0C0FF' : '#FFFFFF';
+            }
+            update(dt) {
+                this.alpha += this.speed * dt;
+                if (this.alpha >= 1) {
+                    this.alpha = 1;
+                    this.speed *= -1;
+                } else if (this.alpha <= 0) {
+                    this.reset(false);
+                }
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        const ambientStars = Array.from({ length: 150 }, () => new AmbientStar());
+
+        // Central interactive flower
+        let centralFlower = {
+            baseRadius: 80,
+            radius: 80,
+            rotation: 0,
+            pulseTime: 0,
+            scale: 1,
+            z: 0
+        };
+
+        // 3D Starfield particles
+        class SpaceParticle {
+            constructor() {
+                this.reset();
+                this.z = Math.random() * 2000; // Scatter initial Z
+            }
+            reset() {
+                this.x = (Math.random() - 0.5) * 3000;
+                this.y = (Math.random() - 0.5) * 3000;
+                this.z = 2000;
+                this.size = Math.random() * 2 + 1;
+                this.color = Math.random() > 0.5 ? '#FFF' : '#FFD700'; // White and Gold dust
+            }
+            update(dt, speedMultiplier) {
+                this.z -= 500 * dt * speedMultiplier;
+                if (this.z <= 0) this.reset();
+            }
+            draw(ctx) {
+                if (this.z < 1) return;
+                const scale = fov / (fov + this.z);
+                const x2d = centerX + this.x * scale;
+                const y2d = centerY + this.y * scale;
+                const r = this.size * scale;
+                
+                if (x2d >= 0 && x2d <= width && y2d >= 0 && y2d <= height) {
+                    ctx.fillStyle = this.color;
+                    ctx.globalAlpha = Math.min(1, scale * 2);
+                    ctx.beginPath();
+                    ctx.arc(x2d, y2d, Math.max(r, 0.5), 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+
+        // 3D Floating Sunflowers
+        class SpaceFlower {
+            constructor() {
+                this.reset();
+                this.z = Math.random() * 3000;
+            }
+            reset() {
+                this.x = (Math.random() - 0.5) * 4000;
+                this.y = (Math.random() - 0.5) * 4000;
+                this.z = 3000 + Math.random() * 1000;
+                this.baseSize = Math.random() * 50 + 20;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 2;
+                this.driftX = (Math.random() - 0.5) * 100;
+                this.driftY = (Math.random() - 0.5) * 100;
+            }
+            update(dt, speedMultiplier) {
+                this.z -= 400 * dt * speedMultiplier;
+                this.rotation += this.rotSpeed * dt;
+                this.x += this.driftX * dt;
+                this.y += this.driftY * dt;
+
+                if (this.z <= -100) this.reset();
+            }
+            draw(ctx) {
+                if (this.z < -100) return;
+                
+                // Calculate 3D projection
+                const scale = fov / (fov + Math.max(1, this.z));
+                const x2d = centerX + this.x * scale;
+                const y2d = centerY + this.y * scale;
+                const size2d = this.baseSize * scale;
+
+                // Frustum culling
+                if (x2d > -size2d && x2d < width + size2d && y2d > -size2d && y2d < height + size2d) {
+                    ctx.save();
+                    ctx.translate(x2d, y2d);
+                    ctx.rotate(this.rotation);
+                    
+                    // Fade in distance and fade out right before passing camera
+                    let alpha = 1;
+                    if (this.z > 2000) alpha = 1 - (this.z - 2000) / 1000;
+                    if (this.z < 100) alpha = Math.max(0, this.z / 100);
+                    ctx.globalAlpha = alpha;
+                    
+                    const imgSize = flowerImageSmall.width;
+                    const renderSize = size2d * 2;
+                    ctx.drawImage(flowerImageSmall, -renderSize/2, -renderSize/2, renderSize, renderSize);
+                    
+                    ctx.restore();
+                }
+            }
+        }
+
+        const spaceParticles = Array.from({ length: 400 }, () => new SpaceParticle());
+        const spaceFlowers = Array.from({ length: 120 }, () => new SpaceFlower());
+
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (appState !== 'INTRO') return;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            
+            const dist = Math.hypot(mouseX - centerX, mouseY - centerY);
+            if (dist < centralFlower.baseRadius * 1.5) {
+                if (!isHoveringFlower) {
+                    isHoveringFlower = true;
+                    canvas.style.cursor = 'pointer';
+                }
+            } else {
+                if (isHoveringFlower) {
+                    isHoveringFlower = false;
+                    canvas.style.cursor = 'default';
+                }
+            }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (appState !== 'INTRO') return;
+            const dist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+            if (dist < centralFlower.baseRadius * 1.5) {
+                startTransition();
+            }
+        });
+
+        function startTransition() {
+            appState = 'TRANS';
+            canvas.style.cursor = 'default';
+            instructions.classList.add('hidden');
+            
+            // Show quote elegantly as the universe blooms
+            setTimeout(() => {
+                quote.classList.add('visible');
+            }, 1200); // 1.2 seconds delay aligns nicely with the white flash
+
+            // Sort flowers by Z initially so they render correctly
+            spaceFlowers.sort((a, b) => b.z - a.z);
+        }
+
+        function drawBackground() {
+            // Very dark gradient mimicking deep space
+            const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(width, height));
+            grad.addColorStop(0, '#0a0a1a');
+            grad.addColorStop(1, '#020205');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        function animate(timestamp) {
+            // Delta time calculation for smooth framing
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000; // Delta time in seconds
+            lastTime = timestamp;
+
+            // Clear screen
+            drawBackground();
+
+            if (appState === 'INTRO') {
+                // Draw starry background
+                ambientStars.forEach(star => {
+                    star.update(dt);
+                    star.draw(ctx);
+                });
+
+                // Update central flower pulse and rotation
+                centralFlower.pulseTime += dt * 3;
+                centralFlower.rotation += dt * 0.2;
+                
+                let targetScale = isHoveringFlower ? 1.15 : 1.0;
+                centralFlower.scale += (targetScale - centralFlower.scale) * dt * 10;
+                
+                const currentRadius = centralFlower.baseRadius * centralFlower.scale + Math.sin(centralFlower.pulseTime) * 3;
+
+                // Render glowing central flower
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(centralFlower.rotation);
+                
+                // Outer glow
+                ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+                ctx.shadowBlur = 40 + Math.sin(centralFlower.pulseTime) * 15;
+                
+                const renderSize = currentRadius * 2;
+                ctx.drawImage(flowerImageLarge, -renderSize/2, -renderSize/2, renderSize, renderSize);
+                
+                ctx.restore();
+
+            } else if (appState === 'TRANS') {
+                transitionProgress += dt * 0.8; // Duration of transition
+                
+                // Draw starry background fading out
+                ctx.globalAlpha = Math.max(0, 1 - transitionProgress * 2);
+                ambientStars.forEach(star => star.draw(ctx));
+                ctx.globalAlpha = 1.0;
+
+                // Expand and rotate central flower wildly
+                centralFlower.scale += dt * 50; 
+                centralFlower.rotation += dt * 5;
+                const currentRadius = centralFlower.baseRadius * centralFlower.scale;
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(centralFlower.rotation);
+                const renderSize = currentRadius * 2;
+                ctx.drawImage(flowerImageLarge, -renderSize/2, -renderSize/2, renderSize, renderSize);
+                ctx.restore();
+
+                // Flash overlay (white/gold)
+                if (transitionProgress > 0.4 && transitionProgress < 0.8) {
+                    flashAlpha = Math.min(1, (transitionProgress - 0.4) * 4);
+                } else if (transitionProgress >= 0.8) {
+                    flashAlpha = Math.max(0, 1 - (transitionProgress - 0.8) * 5);
+                }
+
+                if (flashAlpha > 0) {
+                    ctx.globalAlpha = flashAlpha;
+                    ctx.fillStyle = '#FFF8E7'; // Cosmic white-gold
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.globalAlpha = 1.0;
+                }
+
+                if (transitionProgress >= 1) {
+                    appState = 'UNIVERSE';
+                }
+
+            } else if (appState === 'UNIVERSE') {
+                // Nebula glow effect in the center
+                const nebula = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, height);
+                nebula.addColorStop(0, 'rgba(40, 30, 0, 0.3)');
+                nebula.addColorStop(0.5, 'rgba(10, 5, 20, 0.2)');
+                nebula.addColorStop(1, 'transparent');
+                
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = nebula;
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'source-over';
+
+                // Speed calculation (burst initially, then settle to a majestic cruise)
+                let speedMultiplier = 1;
+                if (transitionProgress > 1 && transitionProgress < 3) {
+                    // Hyperdrive easing out
+                    const warp = 3 - transitionProgress;
+                    speedMultiplier = 1 + warp * 5;
+                    transitionProgress += dt;
+                }
+
+                // Update and draw space dust/particles
+                spaceParticles.forEach(p => {
+                    p.update(dt, speedMultiplier);
+                    p.draw(ctx);
+                });
+
+                // Sort flowers back-to-front (Painter's algorithm) for proper 3D overlap
+                spaceFlowers.sort((a, b) => b.z - a.z);
+
+                // Update and draw floating universe flowers
+                spaceFlowers.forEach(f => {
+                    f.update(dt, speedMultiplier);
+                    f.draw(ctx);
+                });
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // Start the loop
+        animate(0);
+
+    </script>
+</body>
+</html>
